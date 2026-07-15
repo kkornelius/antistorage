@@ -5,10 +5,10 @@ import { tokenStore } from './token-store'
 import type { StorageAccount } from '../../shared/types'
 
 // .env is auto-injected by electron-vite with MAIN_VITE_ prefix
-const CLIENT_ID = import.meta.env.MAIN_VITE_GOOGLE_CLIENT_ID || ''
-const CLIENT_SECRET = import.meta.env.MAIN_VITE_GOOGLE_CLIENT_SECRET || ''
+const CLIENT_ID = (import.meta.env as any).MAIN_VITE_GOOGLE_CLIENT_ID || ''
+const CLIENT_SECRET = (import.meta.env as any).MAIN_VITE_GOOGLE_CLIENT_SECRET || ''
 const REDIRECT_URI =
-  import.meta.env.MAIN_VITE_GOOGLE_REDIRECT_URI || 'http://localhost:8765/auth/callback'
+  (import.meta.env as any).MAIN_VITE_GOOGLE_REDIRECT_URI || 'http://localhost:8765/auth/callback'
 
 console.log('[AntiStorage] OAuth Config:', {
   clientId: CLIENT_ID ? `${CLIENT_ID.substring(0, 20)}...` : 'MISSING',
@@ -48,7 +48,7 @@ class AuthService {
       throw new Error(`No tokens found for account ${accountId}`)
     }
 
-    const client = this.createOAuthClient(tokens)
+    const client = this.createOAuthClient(tokens as any)
 
     // Update tokens on refresh
     client.on('tokens', (newTokens) => {
@@ -56,7 +56,7 @@ class AuthService {
       if (current) {
         tokenStore.updateTokens(accountId, {
           ...current,
-          ...newTokens
+          ...(newTokens as any)
         })
       }
     })
@@ -234,8 +234,8 @@ class AuthService {
     const tokens = tokenStore.getTokens(accountId)
     if (tokens) {
       try {
-        const client = this.createOAuthClient(tokens)
-        await client.revokeToken(tokens.access_token)
+        const client = this.createOAuthClient(tokens as any)
+        await client.revokeToken(tokens.access_token as string)
       } catch (err) {
         console.warn('Failed to revoke token (may be expired):', err)
       }
@@ -273,6 +273,132 @@ class AuthService {
     } catch (err) {
       console.error('Mega login error:', err)
       throw new Error('Invalid email or password')
+    }
+  }
+
+  async addTeraboxAccountViaWebview(): Promise<StorageAccount> {
+    const { BrowserWindow, session } = require('electron')
+    
+    return new Promise((resolve, reject) => {
+      let resolved = false
+
+      const win = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
+        }
+      })
+      
+      win.loadURL('https://dm.terabox.com/main')
+      
+      const checkLogin = async () => {
+        if (resolved) return
+        try {
+          const cookies = await session.defaultSession.cookies.get({ domain: '.terabox.com' })
+          const ndusCookie = cookies.find((c: any) => c.name === 'ndus')
+          if (ndusCookie) {
+            const cookieString = cookies.map((c: any) => `${c.name}=${c.value}`).join('; ')
+            const jsTokenRes = await win.webContents.executeJavaScript('window.jsToken || ""')
+            
+            if (jsTokenRes) {
+              resolved = true
+              win.close()
+              resolve(this.addTeraboxAccount(cookieString, jsTokenRes))
+            }
+          }
+        } catch (err) {
+          // Ignore extraction errors during navigation
+        }
+      }
+
+      win.webContents.on('did-navigate', checkLogin)
+      win.webContents.on('did-navigate-in-page', checkLogin)
+      win.webContents.on('dom-ready', checkLogin)
+      
+      win.on('closed', () => {
+        if (!resolved) {
+          reject(new Error('Login window closed before completing authentication'))
+        }
+      })
+    })
+  }
+
+  async addTeraboxAccount(ndus: string, jsToken: string): Promise<StorageAccount> {
+    try {
+      const cleanNdus = ndus.trim().replace(/[^\x20-\x7E]/g, '')
+      const cleanJsToken = jsToken.trim()
+
+      const { net } = require('electron')
+      const params = new URLSearchParams({
+        app_id: '250528',
+        web: '1',
+        channel: 'dubox',
+        clienttype: '0',
+        checkfree: '1',
+        checkexpire: '1'
+      })
+
+      const quotaData: any = await new Promise((resolve, reject) => {
+        const req = net.request({
+          method: 'GET',
+          url: `https://dm.terabox.com/api/quota?${params.toString()}`,
+          useSessionCookies: false // Don't use default session cookies, we provide our own
+        })
+
+        req.setHeader('Cookie', (cleanNdus.includes('=') ? cleanNdus : `ndus=${cleanNdus}`).replace(/[^\x20-\x7E]/g, ''))
+        req.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        req.setHeader('Accept', 'application/json, text/plain, */*')
+        req.setHeader('Referer', 'https://dm.terabox.com/')
+        req.setHeader('Origin', 'https://dm.terabox.com')
+
+        req.on('response', (res: any) => {
+          const chunks: Buffer[] = []
+          res.on('data', (c: Buffer) => chunks.push(c))
+          res.on('end', () => {
+            try {
+              const responseText = Buffer.concat(chunks).toString()
+              console.log('[Terabox Auth Check] Response:', responseText)
+              resolve(JSON.parse(responseText))
+            } catch {
+              reject(new Error('Invalid response from Terabox'))
+            }
+          })
+        })
+        req.on('error', reject)
+        req.end()
+      })
+
+      if (quotaData.errno !== 0) {
+        throw new Error(`Terabox Error (errno: ${quotaData.errno}): ${JSON.stringify(quotaData)}`)
+      }
+
+      const ndusValue = cleanNdus.includes('ndus=')
+        ? cleanNdus.split('ndus=')[1].split(';')[0]
+        : cleanNdus.substring(0, 16)
+      
+      const accountId = `terabox-${ndusValue}`
+      const account: StorageAccount = {
+        id: accountId,
+        provider: 'terabox',
+        email: 'terabox-user',
+        displayName: 'Terabox',
+        avatarUrl: '',
+        quota: {
+          used: quotaData.used || 0,
+          total: quotaData.total || 0
+        },
+        connectedAt: Date.now()
+      }
+
+      tokenStore.addAccount(account, { ndus: cleanNdus, jsToken: cleanJsToken })
+      return account
+    } catch (err) {
+      console.error('Terabox login error:', err)
+      throw new Error(
+        err instanceof Error ? err.message : 'Failed to connect to Terabox'
+      )
     }
   }
 

@@ -7,6 +7,7 @@ const api: AntiStorageAPI = {
   auth: {
     addAccount: () => ipcRenderer.invoke('auth:add-account'),
     addMegaAccount: (email: string, password: string) => ipcRenderer.invoke('auth:add-mega-account', email, password),
+    addTeraboxAccount: () => ipcRenderer.invoke('auth:add-terabox-account'),
     cancelAddAccount: () => ipcRenderer.invoke('auth:cancel-add-account'),
     removeAccount: (accountId: string) => ipcRenderer.invoke('auth:remove-account', accountId),
     getAccounts: () => ipcRenderer.invoke('auth:get-accounts')
@@ -18,9 +19,11 @@ const api: AntiStorageAPI = {
       ipcRenderer.invoke('storage:upload-file', accountId, folderId, filePaths),
     downloadFile: (accountId: string, fileId: string, fileName: string) =>
       ipcRenderer.invoke('storage:download-file', accountId, fileId, fileName),
-    deleteFile: (accountId: string, fileId: string, parentFolderId?: string) =>
+    deleteFile: (accountId: string, fileId: string, parentFolderId?: string): Promise<any> =>
       ipcRenderer.invoke('storage:delete-file', accountId, fileId, parentFolderId),
-    createFolder: (accountId: string, parentId: string, name: string) =>
+    deleteFiles: (accountId: string, fileIds: string[], parentFolderId?: string): Promise<any> =>
+      ipcRenderer.invoke('storage:delete-files', accountId, fileIds, parentFolderId),
+    createFolder: (accountId: string, parentId: string, name: string): Promise<any> =>
       ipcRenderer.invoke('storage:create-folder', accountId, parentId, name),
     moveFile: (accountId: string, fileId: string, newParentId: string) =>
       ipcRenderer.invoke('storage:move-file', accountId, fileId, newParentId),

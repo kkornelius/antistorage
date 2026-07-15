@@ -76,7 +76,7 @@ class GDriveService {
     const stream = createReadStream(filePath)
 
     let uploaded = 0
-    stream.on('data', (chunk: Buffer) => {
+    stream.on('data', (chunk: any) => {
       uploaded += chunk.length
       const progress = Math.round((uploaded / fileSize) * 100)
       onProgress?.(progress)
@@ -195,11 +195,21 @@ class GDriveService {
   }
 
   async deleteFile(accountId: string, fileId: string, _parentFolderId?: string): Promise<void> {
+    return this.deleteFiles(accountId, [fileId], _parentFolderId)
+  }
+
+  async deleteFiles(accountId: string, fileIds: string[], _parentFolderId?: string): Promise<void> {
+    if (!fileIds || fileIds.length === 0) return
     const drive = this.getDrive(accountId)
-    await drive.files.update({
-      fileId,
-      requestBody: { trashed: true }
-    })
+    // GDrive supports high concurrency, Promise.all is sufficient
+    await Promise.all(
+      fileIds.map((fileId) =>
+        drive.files.update({
+          fileId,
+          requestBody: { trashed: true }
+        })
+      )
+    )
   }
 
   async createFolder(accountId: string, parentId: string, name: string): Promise<CloudFile> {

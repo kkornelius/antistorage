@@ -16,7 +16,7 @@ export function Sidebar(): JSX.Element {
   const activeAccount = accounts.find((a) => a.id === activeAccountId)
 
   const [isAddingAccount, setIsAddingAccount] = useState(false)
-  const [showMegaLogin, setShowMegaLogin] = useState(false)
+  const [loginProvider, setLoginProvider] = useState<'mega' | 'terabox' | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const pendingDeleteAccount = pendingDeleteId
@@ -144,13 +144,18 @@ export function Sidebar(): JSX.Element {
           )}
         </button>
 
-        <button className="add-account-btn" onClick={() => setShowMegaLogin(true)} style={{ marginTop: '0' }}>
+        <button className="add-account-btn" onClick={() => setLoginProvider('mega')} style={{ marginTop: '0' }}>
           <Plus size={16} />
           Mega Account
         </button>
+
+        <button className="add-account-btn" onClick={() => setLoginProvider('terabox')} style={{ marginTop: '0' }}>
+          <Plus size={16} />
+          Terabox Account
+        </button>
       </div>
 
-      {showMegaLogin && <ProviderLoginModal onClose={() => setShowMegaLogin(false)} />}
+      {loginProvider && <ProviderLoginModal provider={loginProvider} onClose={() => setLoginProvider(null)} />}
 
       <div className="sidebar-section">
         <div className="sidebar-section-title">Navigation</div>
@@ -180,9 +185,7 @@ export function Sidebar(): JSX.Element {
         </button>
       </nav>
 
-      <div style={{ flex: 1 }} />
-
-      <button className="sidebar-nav-item" onClick={toggleSettings}>
+      <button className="sidebar-nav-item" onClick={toggleSettings} style={{ marginTop: 'auto' }}>
         <Settings size={18} />
         Settings
       </button>

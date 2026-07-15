@@ -102,5 +102,8 @@ export function getFileIcon(mimeType: string, size = 20): JSX.Element {
 
 export function getQuotaPercent(used: number, total: number): number {
   if (total === 0) return 0
-  return Math.min(100, Math.round((used / total) * 100))
+  if (used === 0) return 0
+  const pct = Math.round((used / total) * 100)
+  // Ensure at least 1% so the bar is visible when there's any usage
+  return Math.min(100, Math.max(1, pct))
 }

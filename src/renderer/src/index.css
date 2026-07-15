@@ -280,7 +280,8 @@ html, body, #root {
 }
 
 .sidebar-accounts {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 120px;
   overflow-y: auto;
   padding: var(--space-xs) var(--space-md);
 }
@@ -395,6 +396,7 @@ html, body, #root {
   border-radius: var(--radius-full);
   background: var(--accent-gradient);
   transition: width var(--transition-slow);
+  min-width: 2%;
 }
 
 /* --- Add Account Button --- */
@@ -447,6 +449,7 @@ html, body, #root {
   border-radius: var(--radius-full);
   background: var(--accent-gradient);
   transition: width var(--transition-slow);
+  min-width: 2%;
 }
 
 /* --- Header --- */
@@ -2285,4 +2288,78 @@ input:checked + .toggle-slider:before {
   color: var(--text-primary);
   min-width: 44px;
   text-align: center;
+}
+
+/* ===== Drop Zone Overlay ===== */
+
+@keyframes dropzone-border-dash {
+  0% { background-position: 0 0, 100% 0, 100% 100%, 0 100%; }
+  100% { background-position: 100% 0, 100% 100%, 0 100%, 0 0; }
+}
+
+@keyframes dropzone-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes dropzone-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dropzone-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 18, 0.75);
+  backdrop-filter: blur(12px);
+  animation: dropzone-fade-in 200ms ease-out;
+}
+
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-3xl) 64px;
+  border-radius: var(--radius-xl);
+  background: var(--glass-bg);
+  border: 2px dashed rgba(99, 102, 241, 0.5);
+  position: relative;
+  text-align: center;
+  /* Animated dashed border glow */
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), inset 0 0 40px rgba(99, 102, 241, 0.05);
+}
+
+.dropzone-content svg {
+  color: var(--accent-start);
+  animation: dropzone-pulse 1.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.5));
+}
+
+.dropzone-content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dropzone-content p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+:root.theme-light .dropzone-overlay {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+:root.theme-light .dropzone-content {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.1), inset 0 0 40px rgba(99, 102, 241, 0.03);
 }

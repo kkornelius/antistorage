@@ -85,35 +85,26 @@ export function ContextMenu(): JSX.Element | null {
   }
 
   const executeDelete = async (targetIds: string[]): Promise<void> => {
-    if (!activeAccountId) return
+    if (!activeAccountId || targetIds.length === 0) return
 
     const { currentFolderId } = useFileStore.getState()
-    let successCount = 0
-    let lastError = ''
+    
+    // Find the first file's parent to pass to the backend (Mega requires this)
+    const firstFileObj = files.find((f) => f.id === targetIds[0])
+    const parentFolderId = firstFileObj?.parentId || currentFolderId || undefined
 
-    for (const id of targetIds) {
-      try {
-        // Pass parentFolderId so Mega can track where to restore the file
-        const fileObj = files.find((f) => f.id === id)
-        const parentFolderId = fileObj?.parentId || currentFolderId || undefined
-        const result = await window.api.storage.deleteFile(activeAccountId, id, parentFolderId)
-        if (result.success) {
-          removeFile(id)
-          successCount++
-        } else {
-          lastError = result.error || 'Delete failed'
-        }
-      } catch {
-        lastError = 'Delete failed'
+    try {
+      const result = await window.api.storage.deleteFiles(activeAccountId, targetIds, parentFolderId)
+      if (result.success) {
+        // Remove all successfully deleted files from the UI
+        targetIds.forEach(id => removeFile(id))
+        showToast(`Moved ${targetIds.length} item(s) to trash`, 'success')
+        clearSelection()
+      } else {
+        showToast(result.error || 'Delete failed', 'error')
       }
-    }
-
-    if (successCount > 0) {
-      showToast(`Moved ${successCount} item(s) to trash`, 'success')
-      clearSelection()
-    }
-    if (lastError && successCount < targetIds.length) {
-      showToast(lastError, 'error')
+    } catch (err) {
+      showToast('Delete failed', 'error')
     }
   }
 

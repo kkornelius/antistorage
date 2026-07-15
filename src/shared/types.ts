@@ -62,6 +62,7 @@ export interface IpcChannels {
   'storage:upload-file': (accountId: string, folderId: string, filePath: string) => Promise<CloudFile>
   'storage:download-file': (accountId: string, fileId: string, destPath: string) => Promise<string>
   'storage:delete-file': (accountId: string, fileId: string, parentFolderId?: string) => Promise<void>
+  'storage:delete-files': (accountId: string, fileIds: string[], parentFolderId?: string) => Promise<void>
   'storage:create-folder': (accountId: string, parentId: string, name: string) => Promise<CloudFile>
   'storage:move-file': (accountId: string, fileId: string, newParentId: string) => Promise<CloudFile>
   'storage:rename-file': (accountId: string, fileId: string, newName: string) => Promise<CloudFile>
@@ -95,6 +96,7 @@ export interface AntiStorageAPI {
   auth: {
     addAccount: () => Promise<StorageAccount>
     addMegaAccount: (email: string, password: string) => Promise<StorageAccount>
+    addTeraboxAccount: () => Promise<StorageAccount>
     cancelAddAccount: () => Promise<void>
     removeAccount: (accountId: string) => Promise<void>
     getAccounts: () => Promise<StorageAccount[]>

@@ -2,13 +2,16 @@ import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { authService } from '../services/auth.service'
 import { gdriveService } from '../services/gdrive.service'
 import { megaService } from '../services/mega.service'
+import { teraboxService } from '../services/terabox.service'
 import { tokenStore } from '../services/token-store'
 import { settingsService, AppSettings } from '../services/settings.service'
 
 function getService(accountId: string) {
   const account = tokenStore.getAccounts().find((a) => a.id === accountId)
   if (!account) throw new Error('Account not found')
-  return account.provider === 'mega' ? megaService : gdriveService
+  if (account.provider === 'mega') return megaService
+  if (account.provider === 'terabox') return teraboxService
+  return gdriveService
 }
 
 export function registerIpcHandlers(): void {
@@ -29,6 +32,16 @@ export function registerIpcHandlers(): void {
       return { success: true, data: account }
     } catch (err) {
       console.error('Add Mega account error:', err)
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('auth:add-terabox-account', async () => {
+    try {
+      const account = await authService.addTeraboxAccountViaWebview()
+      return { success: true, data: account }
+    } catch (err) {
+      console.error('Add Terabox account error:', err)
       return { success: false, error: (err as Error).message }
     }
   })
@@ -128,6 +141,22 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('storage:delete-files', async (_event, accountId: string, fileIds: string[], parentFolderId?: string) => {
+    try {
+      if (getService(accountId).deleteFiles) {
+        await getService(accountId).deleteFiles!(accountId, fileIds, parentFolderId)
+      } else {
+        // Fallback for any service that doesn't implement deleteFiles
+        await Promise.all(
+          fileIds.map((id) => getService(accountId).deleteFile(accountId, id, parentFolderId))
+        )
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle(
     'storage:create-folder',
     async (_event, accountId: string, parentId: string, name: string) => {
@@ -167,6 +196,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('storage:get-quota', async (_event, accountId: string) => {
     try {
       const quota = await getService(accountId).getQuota(accountId)
+      // Persist updated quota to token store
+      tokenStore.updateQuota(accountId, quota)
       return { success: true, data: quota }
     } catch (err) {
       return { success: false, error: (err as Error).message }

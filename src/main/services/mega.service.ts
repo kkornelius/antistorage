@@ -196,28 +196,32 @@ class MegaService {
   }
 
   async deleteFile(accountId: string, fileId: string, parentFolderId?: string): Promise<void> {
+    return this.deleteFiles(accountId, [fileId], parentFolderId)
+  }
+
+  async deleteFiles(accountId: string, fileIds: string[], parentFolderId?: string): Promise<void> {
+    if (!fileIds || fileIds.length === 0) return
     const storage = await this.getStorage(accountId)
-    const file = this.findNodeByHandle(storage, fileId)
-    if (!file) {
-      throw new Error('File not found')
-    }
 
-    // Save original parent folder ID for restore
-    // Use the parentFolderId from frontend (most reliable)
-    const parentId = parentFolderId || (() => {
-      if (!file.parent) return null
-      if (typeof file.parent === 'string') return file.parent
-      return file.parent.handle || file.parent.nodeId || file.parent.h || null
-    })()
+    await Promise.all(
+      fileIds.map(async (fileId) => {
+        const file = this.findNodeByHandle(storage, fileId)
+        if (!file) return
 
-    if (parentId) {
-      this.originalParents.set(fileId, parentId)
-    }
+        const parentId = parentFolderId || (() => {
+          if (!file.parent) return null
+          if (typeof file.parent === 'string') return file.parent
+          return file.parent.handle || file.parent.nodeId || file.parent.h || null
+        })()
 
-    console.log('[Mega] deleteFile:', fileId, 'parentFolderId from frontend:', parentFolderId, 'saved parentId:', parentId)
+        if (parentId) {
+          this.originalParents.set(fileId, parentId)
+        }
 
-    // Move to MEGA's rubbish bin (trash)
-    await file.moveTo(storage.trash)
+        // Move to MEGA's rubbish bin (trash)
+        await file.moveTo(storage.trash)
+      })
+    )
   }
 
   async createFolder(accountId: string, parentId: string, name: string): Promise<CloudFile> {
@@ -302,7 +306,7 @@ class MegaService {
     throw new Error('Not implemented for Mega')
   }
 
-  async getQuota(accountId: string): Promise<StorageQuota> {
+  async getQuota(accountId: string): Promise<any> {
     const storage = await this.getStorage(accountId)
     const info = await storage.getAccountInfo()
     return {

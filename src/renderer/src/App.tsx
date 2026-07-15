@@ -64,6 +64,23 @@ function App(): JSX.Element {
     useSettingsStore.getState().loadSettings()
   }, [])
 
+  // Refresh quota when active account changes
+  useEffect(() => {
+    if (!activeAccountId) return
+    const refreshQuota = async (): Promise<void> => {
+      try {
+        const result = await window.api.storage.getQuota(activeAccountId)
+        if (result.success) {
+          useAccountStore.getState().updateQuota(activeAccountId, result.data)
+        }
+      } catch {
+        // Silently ignore quota refresh errors
+      }
+    }
+    refreshQuota()
+  }, [activeAccountId])
+
+
   // Load files when account or folder changes
   useEffect(() => {
     if (!activeAccountId) {

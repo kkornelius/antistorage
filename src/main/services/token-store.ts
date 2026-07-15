@@ -13,6 +13,9 @@ export interface TokenData {
   // Mega
   password?: string
   session?: any
+  // Terabox
+  ndus?: string
+  jsToken?: string
 }
 
 interface AccountRecord {
@@ -126,4 +129,3 @@ class TokenStore {
 }
 
 export const tokenStore = new TokenStore()
-export type { TokenData }
